@@ -1,24 +1,21 @@
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
 } from "@dnd-kit/core";
-
 import {
   arrayMove,
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
-
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-
 import "./Movie.css";
 
 const API_KEY = "368b32a597589678671f9961e1b4ba2b"; // <-- put your TMDb API key here
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
+const GENRES_URL = `https://api.themoviedb.org/3/genre/movie/list?api_key=${API_KEY}`;
 
 /** Helpers */
 const normalize = (s = "") =>
@@ -125,6 +122,11 @@ async function fetchMovieData(rawTitle) {
 
     if (!match) return null;
 
+    // Fetch additional details including genres and score
+    const detailsUrl = `https://api.themoviedb.org/3/movie/${match.id}?api_key=${API_KEY}`;
+    const detailsRes = await fetch(detailsUrl);
+    const details = await detailsRes.json();
+
     return {
       id: match.id,
       title: match.title,
@@ -132,6 +134,9 @@ async function fetchMovieData(rawTitle) {
       poster: match.poster_path
         ? `${IMAGE_BASE_URL}${match.poster_path}`
         : null,
+      score: match.vote_average,
+      genres: details.genres || [],
+      releaseDate: details.release_date || null,
     };
   } catch (err) {
     console.error("TMDb fetch error", err);
@@ -160,22 +165,59 @@ function SortableItem({ movie, rank }) {
       {movie.poster && (
         <img src={movie.poster} alt={movie.title} className="poster" />
       )}
-      <a href={movie.url} target="_blank" rel="noopener noreferrer">
-        {movie.title}
-      </a>
+      <div className="movie-details">
+        <a href={movie.url} target="_blank" rel="noopener noreferrer">
+          {movie.title}
+        </a>
+        <div className="movie-meta">
+          {movie.score && <span className="score">⭐ {movie.score.toFixed(1)}</span>}
+          {movie.genres.length > 0 && (
+            <span className="genres">
+              {movie.genres.map(g => g.name).join(", ")}
+            </span>
+          )}
+          {movie.releaseDate && (
+            <span className="year">
+              ({new Date(movie.releaseDate).getFullYear()})
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function Movie() {
   const [movies, setMovies] = useState([]);
+  const [allGenres, setAllGenres] = useState([]);
+  const [selectedGenre, setSelectedGenre] = useState("all");
+  const [sortBy, setSortBy] = useState("rank");
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Fetch all available genres
+    const fetchGenres = async () => {
+      try {
+        const res = await fetch(GENRES_URL);
+        const data = await res.json();
+        setAllGenres(data.genres || []);
+      } catch (err) {
+        console.error("Failed to fetch genres", err);
+      }
+    };
+    
+    fetchGenres();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const rawTitle = e.target.elements[0].value.trim();
     if (!rawTitle) return;
 
+    setIsLoading(true);
     const movieObj = await fetchMovieData(rawTitle);
+    setIsLoading(false);
+    
     if (movieObj) {
       setMovies((prev) => [...prev, movieObj]);
     } else {
@@ -191,6 +233,7 @@ export default function Movie() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setIsLoading(true);
     const text = await file.text();
     const titles = text
       .split("\n")
@@ -212,6 +255,7 @@ export default function Movie() {
       alert(`These titles had no good matches and were skipped:\n\n${notFound.join("\n")}`);
     }
 
+    setIsLoading(false);
     // reset file input so same file can be re-uploaded if needed
     e.target.value = "";
   };
@@ -227,6 +271,45 @@ export default function Movie() {
     });
   };
 
+  const filteredAndSortedMovies = () => {
+    let result = [...movies];
+    
+    // Filter by genre
+    if (selectedGenre !== "all") {
+      const genreId = parseInt(selectedGenre);
+      result = result.filter(movie => 
+        movie.genres.some(g => g.id === genreId)
+      );
+    }
+    
+    // Sort by selected option
+    switch(sortBy) {
+      case "score":
+        result.sort((a, b) => (b.score || 0) - (a.score || 0));
+        break;
+      case "title":
+        result.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case "year":
+        result.sort((a, b) => 
+          (new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime())
+        );
+        break;
+      case "rank":
+      default:
+        // Maintain current order (drag-sorted order)
+        break;
+    }
+    
+    return result;
+  };
+
+  const clearList = () => {
+    if (window.confirm("Are you sure you want to clear all movies?")) {
+      setMovies([]);
+    }
+  };
+
   return (
     <div className="movie">
       <h1>My Movie Rankings</h1>
@@ -236,7 +319,58 @@ export default function Movie() {
         <button type="submit">Add Movie</button>
       </form>
 
-      <input type="file" accept=".txt" onChange={handleFileUpload} />
+      <div className="controls">
+        <div className="control-group">
+          <label htmlFor="genre-filter">Filter by Genre:</label>
+          <select 
+            id="genre-filter"
+            value={selectedGenre}
+            onChange={(e) => setSelectedGenre(e.target.value)}
+          >
+            <option value="all">All Genres</option>
+            {allGenres.map(genre => (
+              <option key={genre.id} value={genre.id}>
+                {genre.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="control-group">
+          <label htmlFor="sort-by">Sort by:</label>
+          <select
+            id="sort-by"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="rank">Current Rank</option>
+            <option value="score">Rating Score</option>
+            <option value="title">Title (A-Z)</option>
+            <option value="year">Release Year (Newest)</option>
+          </select>
+        </div>
+
+        <button 
+          type="button" 
+          onClick={clearList}
+          className="clear-btn"
+        >
+          Clear List
+        </button>
+      </div>
+
+      <input 
+        type="file" 
+        accept=".txt" 
+        onChange={handleFileUpload} 
+        className="file-upload"
+      />
+
+      {isLoading && <div className="loading">Loading movie data...</div>}
+
+      <div className="movie-count">
+        Showing {filteredAndSortedMovies().length} of {movies.length} movies
+      </div>
 
       <DndContext
         collisionDetection={closestCenter}
@@ -247,8 +381,12 @@ export default function Movie() {
           items={movies.map((m) => m.id)}
           strategy={verticalListSortingStrategy}
         >
-          {movies.map((movie, index) => (
-            <SortableItem key={movie.id} movie={movie} rank={index + 1} />
+          {filteredAndSortedMovies().map((movie, index) => (
+            <SortableItem 
+              key={movie.id} 
+              movie={movie} 
+              rank={sortBy === "rank" ? index + 1 : null} 
+            />
           ))}
         </SortableContext>
       </DndContext>
