@@ -193,6 +193,8 @@ export default function Movie() {
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [sortBy, setSortBy] = useState("rank");
   const [isLoading, setIsLoading] = useState(false);
+  const USER_ID = "12345"
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     // Fetch all available genres
@@ -205,9 +207,42 @@ export default function Movie() {
         console.error("Failed to fetch genres", err);
       }
     };
+
+    const fetchRankings = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/rankings?userId=${USER_ID}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.movies) setMovies(data.movies);
+        }
+      } catch (err) {
+        console.error("Failed to fetch rankings", err);
+      }
+    };
     
     fetchGenres();
+    fetchRankings();
   }, []);
+
+  const saveRankings = async (updatedMovies) => {
+    try {
+      await fetch("http://localhost:5000/rankings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: USER_ID,
+          movies: updatedMovies
+        })
+      });
+      setSaveMessage("✅ Rankings saved!");
+      // Clear the message after a few seconds
+      setTimeout(() => setSaveMessage(""), 3000);
+    } catch (err) {
+      console.error("Failed to save rankings", err);
+      setSaveMessage("⚠ Failed to save rankings");
+      setTimeout(() => setSaveMessage(""), 3000);
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -219,11 +254,13 @@ export default function Movie() {
     setIsLoading(false);
     
     if (movieObj) {
-      setMovies((prev) => [...prev, movieObj]);
+      setMovies((prev) => {
+        const updated = [...prev, movieObj];
+        saveRankings(updated);
+        return updated;
+      });
     } else {
-      alert(
-        `No good exact match found for "${rawTitle}". Try adding a year (e.g. "Moonrise Kingdom 2012") or check spelling.`
-      );
+      alert(`No good exact match found for "${rawTitle}". Try adding a year.`);
     }
 
     e.target.reset();
@@ -250,7 +287,10 @@ export default function Movie() {
       else notFound.push(t);
     }
 
-    if (movieList.length > 0) setMovies(movieList);
+    if (movieList.length > 0) {
+      setMovies(movieList);
+      saveRankings(movieList);
+    }
     if (notFound.length > 0) {
       alert(`These titles had no good matches and were skipped:\n\n${notFound.join("\n")}`);
     }
@@ -267,7 +307,8 @@ export default function Movie() {
     setMovies((items) => {
       const oldIndex = items.findIndex((item) => item.id === active.id);
       const newIndex = items.findIndex((item) => item.id === over.id);
-      return arrayMove(items, oldIndex, newIndex);
+      const updated = arrayMove(items, oldIndex, newIndex);
+      return updated;
     });
   };
 
@@ -307,8 +348,10 @@ export default function Movie() {
   const clearList = () => {
     if (window.confirm("Are you sure you want to clear all movies?")) {
       setMovies([]);
+      saveRankings([]);
     }
   };
+
 
   return (
     <div className="movie">
@@ -335,6 +378,18 @@ export default function Movie() {
             ))}
           </select>
         </div>
+
+        <div className="save-feedback">{saveMessage}</div>
+        <button
+          type="button"
+          onClick={() => saveRankings(movies)}
+          disabled={movies.length === 0}
+          className="save-btn"
+        >
+          Save Rankings
+        </button>
+
+
 
         <div className="control-group">
           <label htmlFor="sort-by">Sort by:</label>
