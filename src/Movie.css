@@ -246,3 +246,24 @@ select option:hover {
   background-color: #ff6347;
   color: #fff;
 }
+
+.file-upload {
+  display: none;
+}
+
+.import-btn {
+  background: linear-gradient(90deg, #ff8c00, #ff6347);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.import-btn:hover {
+  background: linear-gradient(90deg, #ff6347, #ff8c00);
+  box-shadow: 0 0 10px rgba(255, 140, 0, 0.5);
+  transform: translateY(-2px);
+}

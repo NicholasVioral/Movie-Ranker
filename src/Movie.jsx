@@ -13,6 +13,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import "./Movie.css";
 import Papa from "papaparse";
+import DirectorStats from "./DirectorStats";
 
 const API_KEY = "368b32a597589678671f9961e1b4ba2b";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
@@ -216,6 +217,9 @@ export default function Movie() {
   const USER_ID = "12345"
   const [saveMessage, setSaveMessage] = useState("");
   const [filterRating, setFilterRating] = useState("All");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResult, setSearchResult] = useState(null);
+
 
   useEffect(() => {
     // Fetch all available genres
@@ -255,6 +259,26 @@ export default function Movie() {
     fetchGenres();
     fetchRankings();
   }, []);
+
+  const handleSearch = () => {
+    const result = movies.find(
+      (m) => m.title.toLowerCase() === searchTerm.toLowerCase()
+    );
+
+    if (!result) {
+      setSearchResult(null);
+      return;
+    }
+
+    // Find its rank within its rating group
+    const group = movies.filter((m) => m.userRating === result.userRating);
+    const rankInGroup = group.findIndex((m) => m.id === result.id) + 1;
+
+    setSearchResult({
+      ...result,
+      rankInGroup,
+    });
+  };
 
 
 
@@ -406,40 +430,81 @@ export default function Movie() {
   : movies.filter(movie => movie.userRating === Number(filterRating));
 
 
+  const TMDB_API_KEY = "YOUR_TMDB_KEY";
 
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
+    const file = e.target.files[0];
     if (!file) return;
 
-    setIsLoading(true);
     const text = await file.text();
     const titles = text
       .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0);
 
-    const movieList = [];
-    const notFound = [];
+    setIsLoading(true);
 
-    // Sequential fetch to preserve order and avoid rate limits
-    for (const t of titles) {
-      const movieObj = await fetchMovieData(t);
-      if (movieObj) movieList.push(movieObj);
-      else notFound.push(t);
+    const newMovies = [];
+
+    for (const title of titles) {
+      try {
+        // 1. Search TMDb by title
+        const searchRes = await fetch(
+          `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(
+            title
+          )}`
+        );
+        const searchData = await searchRes.json();
+
+        if (searchData.results && searchData.results.length > 0) {
+          const movieId = searchData.results[0].id;
+
+          // 2. Get full movie details (includes crew info)
+          const detailsRes = await fetch(
+            `https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}&append_to_response=credits`
+          );
+          const details = await detailsRes.json();
+
+          const director = details.credits.crew.find(
+            (c) => c.job === "Director"
+          )?.name;
+
+          const writers = details.credits.crew
+            .filter((c) => c.department === "Writing")
+            .map((c) => c.name);
+
+          newMovies.push({
+            id: movieId,
+            title: details.title,
+            year: details.release_date?.split("-")[0] || "N/A",
+            director: director || "Unknown",
+            writers: writers.length ? writers : ["Unknown"],
+            genres: details.genres.map((g) => g.name),
+            poster: details.poster_path
+              ? `https://image.tmdb.org/t/p/w500${details.poster_path}`
+              : null,
+            userRating: null, // stays unsorted
+            rank: null,
+          });
+        } else {
+          // fallback if no TMDb match
+          newMovies.push({
+            id: crypto.randomUUID(),
+            title,
+            userRating: null,
+            rank: null,
+          });
+        }
+      } catch (err) {
+        console.error("TMDb fetch error:", err);
+      }
     }
 
-    if (movieList.length > 0) {
-      setMovies(movieList);
-      saveRankings(movieList);
-    }
-    if (notFound.length > 0) {
-      alert(`These titles had no good matches and were skipped:\n\n${notFound.join("\n")}`);
-    }
-
+    // 3. Merge new movies into your existing state
+    setMovies((prev) => [...prev, ...newMovies]);
     setIsLoading(false);
-    // reset file input so same file can be re-uploaded if needed
-    e.target.value = "";
   };
+
 
   const handleExport = () => {
   if (!movies || movies.length === 0) {
@@ -487,15 +552,37 @@ export default function Movie() {
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
 
-    setMovies((items) => {
-      const oldIndex = items.findIndex((item) => item.id === active.id);
-      const newIndex = items.findIndex((item) => item.id === over.id);
-      const updated = arrayMove(items, oldIndex, newIndex);
+    const activeId = active.id;
+    const overContainer = over.data?.current?.sortable?.containerId || over.id;
+
+    setMovies((movies) => {
+      const activeMovie = movies.find((m) => m.id === activeId);
+      if (!activeMovie) return movies;
+
+      // Detect if user moved to a new rating tier
+      const newRating =
+        overContainer === "Unsorted" ? null : parseInt(overContainer, 10);
+      const hasChangedTier = activeMovie.userRating !== newRating;
+
+      // Move item to correct position
+      const oldIndex = movies.findIndex((m) => m.id === activeId);
+      const newIndex = movies.findIndex((m) => m.id === over.id);
+
+      let updated = arrayMove(movies, oldIndex, newIndex);
+
+      if (hasChangedTier) {
+        updated = updated.map((m) =>
+          m.id === activeId ? { ...m, userRating: newRating } : m
+        );
+      }
+
+      saveRankings(updated);
       return updated;
     });
   };
+
 
   const filteredAndSortedMovies = () => {
     let result = [...movies];
@@ -542,21 +629,25 @@ export default function Movie() {
     <div className="movie">
       <h1>My Movie Rankings</h1>
 
+      {/* === Add Movie Form === */}
       <form onSubmit={handleSubmit}>
         <input type="text" placeholder="Movie Title" />
         <button type="submit">Add Movie</button>
       </form>
 
+      {/* === Top Controls === */}
       <div className="controls">
+
+        {/* === Filters === */}
         <div className="control-group">
-          <label htmlFor="genre-filter">Filter by Genre:</label>
-          <select 
+          <label htmlFor="genre-filter">Genre:</label>
+          <select
             id="genre-filter"
             value={selectedGenre}
             onChange={(e) => setSelectedGenre(e.target.value)}
           >
             <option value="all">All Genres</option>
-            {allGenres.map(genre => (
+            {allGenres.map((genre) => (
               <option key={genre.id} value={genre.id}>
                 {genre.name}
               </option>
@@ -564,21 +655,23 @@ export default function Movie() {
           </select>
         </div>
 
-        <div className="save-feedback">{saveMessage}</div>
-        <button
-          type="button"
-          onClick={() => saveRankings(movies)}
-          disabled={movies.length === 0}
-          className="save-btn"
-        >
-          Save Rankings
-        </button>
+        <div className="control-group">
+          <label htmlFor="filter-rating">Rating:</label>
+          <select
+            id="filter-rating"
+            value={filterRating}
+            onChange={(e) => setFilterRating(e.target.value)}
+          >
+            <option value="All">All</option>
+            {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((r) => (
+              <option key={r} value={r}>
+                {r}-Star
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <button className="export-btn" onClick={handleExport}>
-          Export Rankings
-        </button>
-
-
+        {/* === Sorting === */}
         <div className="control-group">
           <label htmlFor="sort-by">Sort by:</label>
           <select
@@ -592,9 +685,12 @@ export default function Movie() {
             <option value="year">Release Year (Newest)</option>
           </select>
         </div>
+      </div>
 
+      {/* === Import / Export / Save === */}
+      <div className="controls">
         <label className="import-btn">
-          Import from IMDb
+          Import IMDb
           <input
             type="file"
             accept=".csv"
@@ -604,7 +700,7 @@ export default function Movie() {
         </label>
 
         <label className="import-btn">
-          Import from Letterboxd
+          Import Letterboxd
           <input
             type="file"
             accept=".csv"
@@ -613,18 +709,32 @@ export default function Movie() {
           />
         </label>
 
+        <label className="import-btn">
+          📁 Import Notes
+          <input
+            type="file"
+            accept=".txt"
+            onChange={handleFileUpload}
+            className="file-upload"
+            style={{ display: "none" }}
+          />
+        </label>
 
-        <select value={filterRating} onChange={(e) => setFilterRating(e.target.value)}>
-          <option value="All">All</option>
-          {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(r => (
-            <option key={r} value={r}>{r}-Star</option>
-          ))}
-        </select>
+        <button
+          type="button"
+          onClick={() => saveRankings(movies)}
+          disabled={movies.length === 0}
+          className="save-btn"
+        >
+          Save Rankings
+        </button>
 
+        <button className="export-btn" onClick={handleExport}>
+          Export Rankings
+        </button>
 
-
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={clearList}
           className="clear-btn"
         >
@@ -632,15 +742,10 @@ export default function Movie() {
         </button>
       </div>
 
-      <input 
-        type="file" 
-        accept=".txt" 
-        onChange={handleFileUpload} 
-        className="file-upload"
-      />
+      {/* === Status Message === */}
+      {saveMessage && <div className="save-feedback">{saveMessage}</div>}
 
-      {isLoading && <div className="loading">Loading movie data...</div>}
-
+      {/* === Movie Count === */}
       <div className="movie-count">
         Showing {filteredAndSortedMovies().length} of {movies.length} movies
       </div>
@@ -650,41 +755,66 @@ export default function Movie() {
         onDragEnd={handleDragEnd}
         modifiers={[restrictToVerticalAxis]}
       >
-        <SortableContext
-          items={displayedMovies.map((m) => m.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {Object.entries(groupByRating(
+        {Object.entries(
+          groupByRating(
             filterRating === "All"
               ? filteredAndSortedMovies()
               : filteredAndSortedMovies().filter(
                   (m) => m.userRating === Number(filterRating)
                 )
-          ))
+          )
+        )
           .sort(([aKey], [bKey]) => {
-            if (aKey === "Unsorted") return -1; // always first
+            if (aKey === "Unsorted") return -1;
             if (bKey === "Unsorted") return 1;
             return bKey - aKey;
           })
           .map(([rating, group]) => (
-            <div key={rating} className="rating-group">
-              <h2 className="rating-divider">
-                {rating === "Unsorted" ? "🎬 Unsorted Movies" : `${rating}★ Movies`}
-              </h2>
-              {group.map((movie, index) => (
-                <SortableItem
-                  key={movie.id || `${movie.title}-${index}`}
-                  movie={movie}
-                  rank={sortBy === "rank" && rating !== "Unsorted" ? index + 1 : null}
-                  onDelete={handleDelete}
-                  setMovies={setMovies}
-                  saveRankings={saveRankings}
-                />
-              ))}
-            </div>
+            <SortableContext
+              key={rating}
+              id={rating.toString()}
+              items={group.map((m) => m.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="rating-group" data-rating={rating}>
+                <h2 className="rating-divider">
+                  {rating === "Unsorted" ? "🎬 Unsorted Movies" : `${rating}★ Movies`}
+                </h2>
+                {group.map((movie, index) => (
+                  <SortableItem
+                    key={movie.id || `${movie.title}-${index}`}
+                    movie={movie}
+                    rank={sortBy === "rank" && rating !== "Unsorted" ? index + 1 : null}
+                    onDelete={handleDelete}
+                    setMovies={setMovies}
+                    saveRankings={saveRankings}
+                  />
+                ))}
+              </div>
+            </SortableContext>
           ))}
-        </SortableContext>
       </DndContext>
+
+      <DirectorStats movies={movies} />
     </div>
   );
 }
+
+{/* <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search movie..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button onClick={handleSearch}>Search</button>
+        </div>
+
+        {searchResult && (
+          <div className="search-result">
+            🎬 <strong>{searchResult.title}</strong>{" "}
+            {searchResult.userRating
+              ? `is ranked #${searchResult.rankInGroup} in ${searchResult.userRating}★ Movies`
+              : "is currently Unrated"}
+          </div>
+        )} */}
