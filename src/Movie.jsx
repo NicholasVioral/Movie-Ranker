@@ -56,6 +56,7 @@ const isIrrelevantTitle = (title = "") => {
 };
 
 /** Improved search with exact-match preference and filtering */
+/** Improved search with exact-match preference and filtering - NOW WITH DIRECTOR DATA */
 async function fetchMovieData(rawTitle) {
   if (!rawTitle) return null;
 
@@ -66,6 +67,7 @@ async function fetchMovieData(rawTitle) {
   const url = `https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(
     cleaned
   )}${year ? `&year=${year}` : ""}`;
+  
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
@@ -124,10 +126,15 @@ async function fetchMovieData(rawTitle) {
 
     if (!match) return null;
 
-    // Fetch additional details including genres and score
-    const detailsUrl = `https://api.themoviedb.org/3/movie/${match.id}?api_key=${API_KEY}`;
+    // Fetch additional details including genres, score, AND DIRECTOR
+    const detailsUrl = `https://api.themoviedb.org/3/movie/${match.id}?api_key=${API_KEY}&append_to_response=credits`;
     const detailsRes = await fetch(detailsUrl);
     const details = await detailsRes.json();
+
+    // Extract director from credits
+    const director = details.credits?.crew?.find(
+      (person) => person.job === "Director"
+    )?.name || "Unknown Director";
 
     return {
       id: match.id,
@@ -139,6 +146,7 @@ async function fetchMovieData(rawTitle) {
       score: match.vote_average,
       genres: details.genres || [],
       releaseDate: details.release_date || null,
+      director: director, // Add director information
     };
   } catch (err) {
     console.error("TMDb fetch error", err);
@@ -384,6 +392,8 @@ export default function Movie() {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
+        setIsLoading(true);
+        
         const parsedMovies = await Promise.all(
           results.data.map(async (row) => {
             const title = row.Name?.trim();
@@ -392,24 +402,43 @@ export default function Movie() {
             const rating = isNaN(rawRating) ? null : rawRating * 2; // Convert 5★ → 10★
             const url = row["Letterboxd URI"];
 
-            // Try to fetch movie data from TMDb for poster, genres, etc.
+            // Try to fetch movie data from TMDb for poster, genres, director, etc.
             const fetched = await fetchMovieData(`${title} ${year}`);
-            return {
-              title,
-              year,
-              userRating: rating,
-              url,
-              ...(fetched || {}),
-            };
+            
+            if (fetched) {
+              return {
+                title,
+                year,
+                userRating: rating,
+                url,
+                ...fetched,
+                // Ensure we have director data
+                director: fetched.director || "Unknown Director"
+              };
+            } else {
+              // Fallback if TMDb search fails
+              return {
+                title,
+                year,
+                userRating: rating,
+                url,
+                director: "Unknown Director",
+                id: crypto.randomUUID()
+              };
+            }
           })
         );
 
-        // Merge with existing movies (instead of overwriting)
+        // Filter out null results and merge with existing movies
+        const validMovies = parsedMovies.filter(movie => movie !== null);
+        
         setMovies((prev) => {
-          const updated = [...prev, ...parsedMovies];
+          const updated = [...prev, ...validMovies];
           saveRankings(updated);
           return updated;
         });
+        
+        setIsLoading(false);
       },
     });
   };
@@ -795,7 +824,6 @@ export default function Movie() {
           ))}
       </DndContext>
 
-      <DirectorStats movies={movies} />
     </div>
   );
 }
