@@ -444,14 +444,19 @@ export default function Movie() {
   };
 
   const groupByRating = (movies) => {
+    // Pre-fill all groups 10 → 1 and Unsorted
     const groups = { Unsorted: [] };
+    for (let r = 10; r >= 1; r--) groups[r] = [];
+
     movies.forEach((movie) => {
       const rating = movie.userRating == null ? "Unsorted" : movie.userRating;
       if (!groups[rating]) groups[rating] = [];
       groups[rating].push(movie);
     });
+
     return groups;
   };
+
 
 
   const displayedMovies = filterRating === "All"
@@ -584,27 +589,52 @@ export default function Movie() {
     if (!over) return;
 
     const activeId = active.id;
-    const overContainer = over.data?.current?.sortable?.containerId || over.id;
+    
+    // Get the target container ID from the over element
+    let overContainerId;
+    
+    // Check if we're dragging over a rating group container
+    if (over.data?.current?.sortable?.containerId) {
+      overContainerId = over.data.current.sortable.containerId;
+    } 
+    // Check if we're dragging over a specific movie item
+    else if (over.id) {
+      // Find which container this movie belongs to
+      const overMovie = movies.find(m => m.id === over.id);
+      overContainerId = overMovie?.userRating == null ? "Unsorted" : overMovie.userRating.toString();
+    }
+    // If dragging over an empty container, get the container ID from the element
+    else {
+      // Try to get the container from the element's parent or data attributes
+      const containerElement = over.closest ? over.closest('[data-rating]') : null;
+      if (containerElement) {
+        overContainerId = containerElement.getAttribute('data-rating');
+      }
+    }
+
+    if (!overContainerId) return;
+
+    const activeMovie = movies.find((m) => m.id === activeId);
+    if (!activeMovie) return;
+
+    const newRating = overContainerId === "Unsorted" ? null : parseInt(overContainerId, 10);
+    const hasChangedTier = activeMovie.userRating !== newRating;
 
     setMovies((movies) => {
-      const activeMovie = movies.find((m) => m.id === activeId);
-      if (!activeMovie) return movies;
-
-      // Detect if user moved to a new rating tier
-      const newRating =
-        overContainer === "Unsorted" ? null : parseInt(overContainer, 10);
-      const hasChangedTier = activeMovie.userRating !== newRating;
-
-      // Move item to correct position
-      const oldIndex = movies.findIndex((m) => m.id === activeId);
-      const newIndex = movies.findIndex((m) => m.id === over.id);
-
-      let updated = arrayMove(movies, oldIndex, newIndex);
+      let updated = [...movies];
 
       if (hasChangedTier) {
-        updated = updated.map((m) =>
-          m.id === activeId ? { ...m, userRating: newRating } : m
-        );
+        // --- ✅ Moved to a new group ---
+        updated = updated
+          .filter((m) => m.id !== activeId)
+          .concat({ ...activeMovie, userRating: newRating });
+      } else {
+        // --- ✅ Reorder within same group ---
+        const oldIndex = movies.findIndex((m) => m.id === activeId);
+        const newIndex = movies.findIndex((m) => m.id === over.id);
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          updated = arrayMove(movies, oldIndex, newIndex);
+        }
       }
 
       saveRankings(updated);
