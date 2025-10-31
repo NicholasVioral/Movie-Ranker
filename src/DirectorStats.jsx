@@ -6,6 +6,9 @@ export default function DirectorStats() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const USER_ID = "12345";
+  const [sortMode, setSortMode] = useState("rating");
+  const [selectedDirector, setSelectedDirector] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -17,7 +20,6 @@ export default function DirectorStats() {
         
         if (isMounted) {
           const moviesData = data.movies || [];
-          console.log("🎬 Loaded movies:", moviesData); // Debug log
           setMovies(moviesData);
         }
       } catch (err) {
@@ -39,8 +41,6 @@ export default function DirectorStats() {
   const statistics = useMemo(() => {
     const ratedMovies = movies.filter((m) => m.userRating != null);
     const totalMovies = ratedMovies.length;
-
-    console.log("⭐ Rated movies for stats:", ratedMovies); // Debug log
 
     // Calculate overall average rating - keep as number for precision
     const avgRatingValue = totalMovies > 0
@@ -65,13 +65,9 @@ export default function DirectorStats() {
       directorMap[dir].ratings.push(rating); // Store individual ratings for debugging
     });
 
-    // Debug: Check director calculations
-    console.log("🎭 Director map raw data:", directorMap);
-
     const directorStats = Object.entries(directorMap)
       .map(([name, data]) => {
         const avg = data.total / data.count;
-        console.log(`📊 ${name}: ${data.ratings.join(', ')} = ${data.total} / ${data.count} = ${avg}`); // Debug log
         return {
           name,
           avg: avg, // Keep as number for now
@@ -81,20 +77,35 @@ export default function DirectorStats() {
           ratings: data.ratings // For debugging
         };
       })
-      .sort((a, b) => b.avg - a.avg);
-
-    console.log("🎯 Final director stats:", directorStats); // Debug log
+      .sort((a, b) => {
+        if (sortMode === "count") {
+          return b.count - a.count;
+        }
+        return b.avg - a.avg;
+      });
 
     const genreMap = {};
-    ratedMovies.forEach(movie => {
-      const genres = movie.genres || [];
-      genres.forEach(genre => {
-        const genreName = genre.name || genre;
-        if (!genreMap[genreName]) genreMap[genreName] = { total: 0, count: 0 };
-        genreMap[genreName].total += Number(movie.userRating || 0);
-        genreMap[genreName].count += 1;
+      ratedMovies.forEach(movie => {
+        // Handle different possible genre formats
+        const genres = movie.genres || [];
+        
+        // Convert to array if it's a string (comma-separated)
+        let genreList = [];
+        if (Array.isArray(genres)) {
+          genreList = genres;
+        } else if (typeof genres === 'string') {
+          genreList = genres.split(',').map(g => g.trim());
+        }
+        
+        genreList.forEach(genre => {
+          const genreName = genre.name || genre;
+          if (genreName && genreName !== '') {
+            if (!genreMap[genreName]) genreMap[genreName] = { total: 0, count: 0 };
+            genreMap[genreName].total += Number(movie.userRating || 0);
+            genreMap[genreName].count += 1;
+          }
+        });
       });
-    });
 
     const genreStats = Object.entries(genreMap)
       .map(([name, data]) => ({
@@ -160,7 +171,7 @@ export default function DirectorStats() {
       lowestRated,
       ratedMoviesCount: ratedMovies.length
     };
-  }, [movies]);
+  }, [movies, sortMode]);
 
   if (loading) {
     return (
@@ -216,6 +227,61 @@ export default function DirectorStats() {
       return rating.toFixed(2);
     }
     return rating;
+  };
+
+  const openDirectorModal = (director) => {
+    console.log("🎬 Opening modal for director:", director.name);
+    setSelectedDirector(director);
+    setIsModalOpen(true);
+  };
+
+  const closeDirectorModal = () => {
+    console.log("❌ Closing modal");
+    setSelectedDirector(null);
+    setIsModalOpen(false);
+  };
+
+  const DirectorModal = () => {
+    if (!selectedDirector) return null;
+
+    return (
+      <div className="modal-overlay" onClick={closeDirectorModal}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2 className="modal-title">{selectedDirector.name}</h2>
+            <button className="modal-close" onClick={closeDirectorModal}>×</button>
+          </div>
+          
+          <div className="modal-body">
+            <div className="director-summary">
+              <div className="director-stat">
+                <span className="stat-value">{selectedDirector.count}</span>
+                <span className="stat-label">Movies Watched</span>
+              </div>
+              <div className="director-stat">
+                <span className="stat-value">{formatRating(selectedDirector.avg)}★</span>
+                <span className="stat-label">Average Rating</span>
+              </div>
+            </div>
+
+            <h3 className="movies-list-title">Your Rated Movies</h3>
+            <div className="director-movies-list">
+              {selectedDirector.movies.map((movieTitle, index) => {
+                const movie = movies.find(m => m.title === movieTitle);
+                return (
+                  <div key={index} className="director-movie-item">
+                    <div className="movie-title">{movieTitle}</div>
+                    <div className="movie-rating">
+                      {movie?.userRating ? `${movie.userRating}★` : "Not rated"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -291,7 +357,13 @@ export default function DirectorStats() {
                     <div key={director.name} className="stats-item">
                       <div className="rank-number">#{index + 1}</div>
                       <div className="item-main">
-                        <div className="item-title">{director.name}</div>
+                        <div 
+                          className="item-title clickable-director" 
+                          onClick={() => openDirectorModal(director)}
+                          style={{cursor: 'pointer', textDecoration: 'underline'}}
+                        >
+                          {director.name}
+                        </div>
                         <div className="item-subtitle">{director.count} movies</div>
                       </div>
                       <div className="item-rating">
@@ -331,13 +403,33 @@ export default function DirectorStats() {
 
         {activeTab === "directors" && (
           <div>
-            <h2 className="section-title">Director Rankings</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="section-title">Director Rankings</h2>
+              <div className="sort-toggle">
+                <label className="mr-2 text-gray-300">Sort by:</label>
+                <select
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value)}
+                  className="bg-gray-800 text-white rounded px-2 py-1 border border-gray-600"
+                >
+                  <option value="rating">Average Rating</option>
+                  <option value="count">Most Watched</option>
+                </select>
+              </div>
+            </div>
             <div className="stats-list">
               {directorStats.map((director, index) => (
                 <div key={director.name} className="stats-item">
                   <div className="rank-number">#{index + 1}</div>
                   <div className="item-main">
-                    <div className="item-title">{director.name}</div>
+                    {/* MAKE THIS DIRECTOR NAME CLICKABLE */}
+                    <div 
+                      className="item-title clickable-director" 
+                      onClick={() => openDirectorModal(director)}
+                      style={{cursor: 'pointer', textDecoration: 'underline'}}
+                    >
+                      {director.name}
+                    </div>
                     <div className="item-subtitle">
                       {director.count} movie{director.count !== 1 ? 's' : ''}
                       {director.ratings && (
@@ -474,6 +566,7 @@ export default function DirectorStats() {
             </div>
           </div>
         )}
+        {isModalOpen && <DirectorModal />}
       </div>
 
       {/* Summary */}

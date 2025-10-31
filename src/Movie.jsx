@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   DndContext,
   closestCenter,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -214,7 +215,17 @@ function SortableItem({ movie, rank, onDelete, setMovies, saveRankings }) {
   );
 }
 
+function DroppablePlaceholder({ rating }) {
+  const { setNodeRef } = useDroppable({
+    id: rating.toString(),
+  });
 
+  return (
+    <div ref={setNodeRef} className="empty-placeholder" data-rating={rating}>
+      
+    </div>
+  );
+}
 
 export default function Movie() {
   const [movies, setMovies] = useState([]);
@@ -287,7 +298,6 @@ export default function Movie() {
       rankInGroup,
     });
   };
-
 
 
   const saveRankings = async (updatedMovies) => {
@@ -541,99 +551,96 @@ export default function Movie() {
 
 
   const handleExport = () => {
-  if (!movies || movies.length === 0) {
-    alert("No movies to export!");
-    return;
-  }
+    if (!movies || movies.length === 0) {
+      alert("No movies to export!");
+      return;
+    }
 
-  const headers = [
-    "Rank",
-    "Title",
-    "Your Rating",
-    "IMDb Rating",
-    "Year",
-    "Genres",
-    "Director",
-    "URL",
-  ];
+    const headers = [
+      "Rank",
+      "Title",
+      "Your Rating",
+      "IMDb Rating",
+      "Year",
+      "Genres",
+      "Director",
+      "URL",
+    ];
 
-  // Sort movies by user rating (highest first)
-  const sortedMovies = [...movies].sort((a, b) => (b.userRating || 0) - (a.userRating || 0));
+    // Sort movies by user rating (highest first)
+    const sortedMovies = [...movies].sort((a, b) => (b.userRating || 0) - (a.userRating || 0));
 
-  const rows = sortedMovies.map((m, i) => [
-    i + 1,
-    `"${m.title}"`,
-    m.userRating ?? "",
-    m.imdbRating ?? "",
-    m.year ?? "",
-    `"${Array.isArray(m.genres) ? m.genres.join(", ") : m.genres || ""}"`,
-    `"${m.director || ""}"`,
-    m.url ?? "",
-  ]);
+    const rows = sortedMovies.map((m, i) => {
+      // ✅ Safely convert genres to readable text
+      const genres = Array.isArray(m.genres)
+        ? m.genres.map((g) => (typeof g === "object" ? g.name : g)).join(", ")
+        : m.genres || "";
 
-  const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+      return [
+        i + 1,
+        `"${m.title}"`,
+        m.userRating ?? "",
+        m.imdbRating ?? "",
+        m.year ?? "",
+        `"${genres}"`,
+        `"${m.director || ""}"`,
+        m.url ?? "",
+      ];
+    });
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.setAttribute("download", "movie_rankings.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+    const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
 
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "movie_rankings.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
     if (!over) return;
 
     const activeId = active.id;
-    
-    // Get the target container ID from the over element
-    let overContainerId;
-    
-    // Check if we're dragging over a rating group container
-    if (over.data?.current?.sortable?.containerId) {
-      overContainerId = over.data.current.sortable.containerId;
+    const activeMovie = movies.find((m) => m.id === activeId);
+    if (!activeMovie) return;
+
+    let overContainerId = null;
+
+    // --- If dropping on an empty placeholder ---
+    if (typeof over.id === "string" && (over.id === "Unsorted" || !isNaN(Number(over.id)))) {
+      overContainerId = over.id;
     } 
-    // Check if we're dragging over a specific movie item
+    // --- If dropping over another movie ---
     else if (over.id) {
-      // Find which container this movie belongs to
-      const overMovie = movies.find(m => m.id === over.id);
-      overContainerId = overMovie?.userRating == null ? "Unsorted" : overMovie.userRating.toString();
-    }
-    // If dragging over an empty container, get the container ID from the element
-    else {
-      // Try to get the container from the element's parent or data attributes
-      const containerElement = over.closest ? over.closest('[data-rating]') : null;
-      if (containerElement) {
-        overContainerId = containerElement.getAttribute('data-rating');
-      }
+      const overMovie = movies.find((m) => m.id === over.id);
+      overContainerId = overMovie
+        ? (overMovie.userRating == null ? "Unsorted" : overMovie.userRating.toString())
+        : null;
     }
 
     if (!overContainerId) return;
 
-    const activeMovie = movies.find((m) => m.id === activeId);
-    if (!activeMovie) return;
-
     const newRating = overContainerId === "Unsorted" ? null : parseInt(overContainerId, 10);
     const hasChangedTier = activeMovie.userRating !== newRating;
 
-    setMovies((movies) => {
-      let updated = [...movies];
+    setMovies((prevMovies) => {
+      let updated = [...prevMovies];
 
       if (hasChangedTier) {
-        // --- ✅ Moved to a new group ---
+        // ✅ Move to a different rating group (even if empty)
         updated = updated
           .filter((m) => m.id !== activeId)
           .concat({ ...activeMovie, userRating: newRating });
       } else {
-        // --- ✅ Reorder within same group ---
-        const oldIndex = movies.findIndex((m) => m.id === activeId);
-        const newIndex = movies.findIndex((m) => m.id === over.id);
+        // ✅ Reorder within the same group
+        const oldIndex = prevMovies.findIndex((m) => m.id === activeId);
+        const newIndex = prevMovies.findIndex((m) => m.id === over.id);
         if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          updated = arrayMove(movies, oldIndex, newIndex);
+          updated = arrayMove(prevMovies, oldIndex, newIndex);
         }
       }
 
@@ -839,16 +846,20 @@ export default function Movie() {
                 <h2 className="rating-divider">
                   {rating === "Unsorted" ? "🎬 Unsorted Movies" : `${rating}★ Movies`}
                 </h2>
+
                 {group.map((movie, index) => (
                   <SortableItem
-                    key={movie.id || `${movie.title}-${index}`}
+                    key={movie.id}
                     movie={movie}
-                    rank={sortBy === "rank" && rating !== "Unsorted" ? index + 1 : null}
+                    rank={index + 1}
                     onDelete={handleDelete}
                     setMovies={setMovies}
                     saveRankings={saveRankings}
                   />
                 ))}
+                {group.length === 0 && (
+                  <DroppablePlaceholder rating={rating} />
+                )}
               </div>
             </SortableContext>
           ))}
