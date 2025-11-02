@@ -8,7 +8,6 @@ export default function DirectorStats() {
   const USER_ID = "12345";
   const [sortMode, setSortMode] = useState("rating");
   const [selectedDirector, setSelectedDirector] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -229,59 +228,16 @@ export default function DirectorStats() {
     return rating;
   };
 
-  const openDirectorModal = (director) => {
-    console.log("🎬 Opening modal for director:", director.name);
+  const handleDirectorClick = (director) => {
     setSelectedDirector(director);
-    setIsModalOpen(true);
+    // Optionally scroll to the director details section
+    setTimeout(() => {
+      document.getElementById('director-details')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
-  const closeDirectorModal = () => {
-    console.log("❌ Closing modal");
+  const clearSelectedDirector = () => {
     setSelectedDirector(null);
-    setIsModalOpen(false);
-  };
-
-  const DirectorModal = () => {
-    if (!selectedDirector) return null;
-
-    return (
-      <div className="modal-overlay" onClick={closeDirectorModal}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2 className="modal-title">{selectedDirector.name}</h2>
-            <button className="modal-close" onClick={closeDirectorModal}>×</button>
-          </div>
-          
-          <div className="modal-body">
-            <div className="director-summary">
-              <div className="director-stat">
-                <span className="stat-value">{selectedDirector.count}</span>
-                <span className="stat-label">Movies Watched</span>
-              </div>
-              <div className="director-stat">
-                <span className="stat-value">{formatRating(selectedDirector.avg)}★</span>
-                <span className="stat-label">Average Rating</span>
-              </div>
-            </div>
-
-            <h3 className="movies-list-title">Your Rated Movies</h3>
-            <div className="director-movies-list">
-              {selectedDirector.movies.map((movieTitle, index) => {
-                const movie = movies.find(m => m.title === movieTitle);
-                return (
-                  <div key={index} className="director-movie-item">
-                    <div className="movie-title">{movieTitle}</div>
-                    <div className="movie-rating">
-                      {movie?.userRating ? `${movie.userRating}★` : "Not rated"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -323,7 +279,13 @@ export default function DirectorStats() {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              // Clear selected director when switching tabs
+              if (tab.id !== "directors") {
+                setSelectedDirector(null);
+              }
+            }}
             className={`stats-tab ${activeTab === tab.id ? 'active' : ''}`}
           >
             {tab.label}
@@ -359,7 +321,7 @@ export default function DirectorStats() {
                       <div className="item-main">
                         <div 
                           className="item-title clickable-director" 
-                          onClick={() => openDirectorModal(director)}
+                          onClick={() => handleDirectorClick(director)}
                           style={{cursor: 'pointer', textDecoration: 'underline'}}
                         >
                           {director.name}
@@ -403,8 +365,57 @@ export default function DirectorStats() {
 
         {activeTab === "directors" && (
           <div>
+            {/* Director Details Section */}
+            {selectedDirector && (
+              <div id="director-details" className="director-details-section mb-8">
+                <div className="director-details-header">
+                  <div>
+                    <h2 className="section-title">{selectedDirector.name}</h2>
+                    <div className="director-rank">
+                      Rank #{directorStats.findIndex(d => d.name === selectedDirector.name) + 1}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={clearSelectedDirector}
+                    className="text-gray-400 hover:text-white text-lg"
+                  >
+                    × Close
+                  </button>
+                </div>
+                
+                <div className="director-summary">
+                  <div className="director-stat">
+                    <span className="stat-value">{selectedDirector.count}</span>
+                    <span className="stat-label">Movies Watched</span>
+                  </div>
+                  <div className="director-stat">
+                    <span className="stat-value">{formatRating(selectedDirector.avg)}★</span>
+                    <span className="stat-label">Average Rating</span>
+                  </div>
+                </div>
+
+                <h3 className="movies-list-title">Your Rated Movies</h3>
+                <div className="director-movies-list">
+                  {selectedDirector.movies.map((movieTitle, index) => {
+                    const movie = movies.find(m => m.title === movieTitle);
+                    return (
+                      <div key={index} className="director-movie-item">
+                        <div className="movie-title">{movieTitle}</div>
+                        <div className="movie-rating">
+                          {movie?.userRating ? `${movie.userRating}★` : "Not rated"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Directors List */}
             <div className="flex justify-between items-center mb-4">
-              <h2 className="section-title">Director Rankings</h2>
+              <h2 className="section-title">
+                {selectedDirector ? 'Other Directors' : 'Director Rankings'}
+              </h2>
               <div className="sort-toggle">
                 <label className="mr-2 text-gray-300">Sort by:</label>
                 <select
@@ -417,15 +428,17 @@ export default function DirectorStats() {
                 </select>
               </div>
             </div>
+            
             <div className="stats-list">
-              {directorStats.map((director, index) => (
+              {directorStats
+                .filter(director => !selectedDirector || director.name !== selectedDirector.name)
+                .map((director, index) => (
                 <div key={director.name} className="stats-item">
                   <div className="rank-number">#{index + 1}</div>
                   <div className="item-main">
-                    {/* MAKE THIS DIRECTOR NAME CLICKABLE */}
                     <div 
                       className="item-title clickable-director" 
-                      onClick={() => openDirectorModal(director)}
+                      onClick={() => handleDirectorClick(director)}
                       style={{cursor: 'pointer', textDecoration: 'underline'}}
                     >
                       {director.name}
@@ -454,7 +467,6 @@ export default function DirectorStats() {
           </div>
         )}
 
-        {/* ... rest of your component remains the same ... */}
         {activeTab === "genres" && (
           <div>
             <h2 className="section-title">Genre Rankings</h2>
@@ -566,7 +578,6 @@ export default function DirectorStats() {
             </div>
           </div>
         )}
-        {isModalOpen && <DirectorModal />}
       </div>
 
       {/* Summary */}
