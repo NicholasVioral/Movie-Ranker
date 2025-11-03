@@ -16,6 +16,7 @@ import "./Movie.css";
 import Papa from "papaparse";
 import DirectorStats from "./DirectorStats";
 
+
 const API_KEY = "368b32a597589678671f9961e1b4ba2b";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
 const GENRES_URL = `https://api.themoviedb.org/3/genre/movie/list?api_key=${API_KEY}`;
@@ -56,8 +57,6 @@ const isIrrelevantTitle = (title = "") => {
   return blacklist.some((b) => t.includes(b));
 };
 
-/** Improved search with exact-match preference and filtering */
-/** Improved search with exact-match preference and filtering - NOW WITH DIRECTOR DATA */
 async function fetchMovieData(rawTitle) {
   if (!rawTitle) return null;
 
@@ -155,7 +154,7 @@ async function fetchMovieData(rawTitle) {
   }
 }
 
-function SortableItem({ movie, rank, onDelete, setMovies, saveRankings }) {
+export function SortableItem({ movie, rank, onDelete, setMovies, saveRankings }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: movie.id });
 
@@ -164,48 +163,72 @@ function SortableItem({ movie, rank, onDelete, setMovies, saveRankings }) {
     transition,
   };
 
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="movie-item">
-      <span className="rank">{rank}.</span>
-      {movie.poster && <img src={movie.poster} alt={movie.title} className="poster" />}
+  const handleRatingChange = (e) => {
+    const newRating = Number(e.target.value);
+    setMovies((prev) => {
+      const updated = prev.map((m) =>
+        m.id === movie.id ? { ...m, userRating: newRating } : m
+      );
+      saveRankings(updated);
+      return updated;
+    });
+  };
 
-      <div className="movie-details">
-        <a href={movie.url} target="_blank" rel="noopener noreferrer">{movie.title}</a>
-        <div className="movie-meta">
-          {movie.score && <span className="score">⭐ {movie.score.toFixed(1)}</span>}
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="movie-item flex items-center justify-between gap-3 bg-gray-800 p-2 rounded-md mb-2"
+    >
+      <span className="rank text-gray-400">{rank}.</span>
+
+      {movie.poster && (
+        <img
+          src={movie.poster}
+          alt={movie.title}
+          className="poster w-10 h-14 object-cover rounded-md"
+        />
+      )}
+
+      <div className="movie-details flex-1">
+        <a
+          href={movie.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white font-medium hover:underline"
+        >
+          {movie.title}
+        </a>
+        <div className="movie-meta text-gray-400 text-sm">
+          {movie.score && <span>⭐ {movie.score.toFixed(1)}</span>}
           {Array.isArray(movie.genres) && movie.genres.length > 0 && (
-            <span className="genres">
-              {movie.genres.map((g) => g.name).join(", ")}
-            </span>
+            <span> • {movie.genres.map((g) => g.name).join(", ")}</span>
           )}
           {movie.releaseDate && (
-            <span className="year">({new Date(movie.releaseDate).getFullYear()})</span>
+            <span> • {new Date(movie.releaseDate).getFullYear()}</span>
           )}
         </div>
       </div>
 
-      {movie.userRating == null && (
-        <select
-          onChange={(e) => {
-            const newRating = Number(e.target.value);
-            setMovies((prev) => {
-              const updated = prev.map((m) =>
-                m.id === movie.id ? { ...m, userRating: newRating } : m
-              );
-              saveRankings(updated);
-              return updated;
-            });
-          }}
-        >
-          <option value="">Set Rating</option>
-          {[10,9,8,7,6,5,4,3,2,1].map(r => (
-            <option key={r} value={r}>{r}★</option>
-          ))}
-        </select>
-      )}
+      {/* 👇 Rating dropdown (always visible) */}
+      <select
+        value={movie.userRating || ""}
+        onChange={handleRatingChange}
+        onPointerDown={(e) => e.stopPropagation()} // prevents drag while changing
+        className="bg-gray-700 text-white rounded-md px-2 py-1 text-sm"
+      >
+        <option value="">Rate</option>
+        {[10,9,8,7,6,5,4,3,2,1].map((r) => (
+          <option key={r} value={r}>
+            {r}★
+          </option>
+        ))}
+      </select>
 
       <button
-        className="delete-btn"
+        className="delete-btn text-gray-400 hover:text-red-400 transition-colors"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => onDelete(movie.title)}
       >
@@ -238,6 +261,8 @@ export default function Movie() {
   const [filterRating, setFilterRating] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResult, setSearchResult] = useState(null);
+  const [showOnlyRating, setShowOnlyRating] = useState(null);
+
 
 
   useEffect(() => {
@@ -693,7 +718,7 @@ export default function Movie() {
 
   return (
     <div className="movie">
-      <h1>My Movie Rankings</h1>
+      <h1>RANKED</h1>
 
       {/* === Add Movie Form === */}
       <form onSubmit={handleSubmit}>
@@ -726,7 +751,11 @@ export default function Movie() {
           <select
             id="filter-rating"
             value={filterRating}
-            onChange={(e) => setFilterRating(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setFilterRating(val);
+              setShowOnlyRating(val === "All" ? null : Number(val));
+            }}
           >
             <option value="All">All</option>
             {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((r) => (
@@ -835,34 +864,71 @@ export default function Movie() {
             if (bKey === "Unsorted") return 1;
             return bKey - aKey;
           })
-          .map(([rating, group]) => (
-            <SortableContext
-              key={rating}
-              id={rating.toString()}
-              items={group.map((m) => m.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="rating-group" data-rating={rating}>
-                <h2 className="rating-divider">
-                  {rating === "Unsorted" ? "🎬 Unsorted Movies" : `${rating}★ Movies`}
-                </h2>
+          .map(([rating, group]) => {
+            if (filterRating !== "All" && Number(rating) !== Number(filterRating)) {
+              return null;
+            }
 
-                {group.map((movie, index) => (
-                  <SortableItem
-                    key={movie.id}
-                    movie={movie}
-                    rank={index + 1}
-                    onDelete={handleDelete}
-                    setMovies={setMovies}
-                    saveRankings={saveRankings}
-                  />
-                ))}
-                {group.length === 0 && (
-                  <DroppablePlaceholder rating={rating} />
-                )}
-              </div>
-            </SortableContext>
-          ))}
+            const colorMap = {
+              10: "#a21caf",
+              9: "#2563eb",
+              8: "#0ea5e9",
+              7: "#14b8a6",
+              6: "#10b981",
+              5: "#84cc16",
+              4: "#eab308",
+              3: "#f97316",
+              2: "#ef4444",
+              1: "#000000ff",
+              Unsorted: "#6b7280",
+            };
+
+
+            const bgColor = colorMap[rating] || "#333";
+
+            return (
+              <SortableContext
+                key={rating}
+                id={rating.toString()}
+                items={group.map((m) => m.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div
+                  className="rating-group"
+                  data-rating={rating}
+                  style={{
+                    backgroundColor: bgColor,
+                    borderRadius: "10px",
+                    padding: "10px",
+                    marginBottom: "20px",
+                    color: "white",
+                  }}
+                >
+                  <h2
+                    className="rating-divider"
+                    style={{ marginBottom: "10px", fontWeight: "bold" }}
+                  >
+                    {rating === "Unsorted"
+                      ? "🎬 Unsorted Movies"
+                      : `${rating}★ Movies`}
+                  </h2>
+
+                  {group.map((movie, index) => (
+                    <SortableItem
+                      key={movie.id}
+                      movie={movie}
+                      rank={index + 1}
+                      onDelete={handleDelete}
+                      setMovies={setMovies}
+                      saveRankings={saveRankings}
+                    />
+                  ))}
+
+                  {group.length === 0 && <DroppablePlaceholder rating={rating} />}
+                </div>
+              </SortableContext>
+            );
+          })}
       </DndContext>
 
     </div>

@@ -8,6 +8,9 @@ export default function DirectorStats() {
   const USER_ID = "12345";
   const [sortMode, setSortMode] = useState("rating");
   const [selectedDirector, setSelectedDirector] = useState(null);
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState(null);
+
 
   useEffect(() => {
     let isMounted = true;
@@ -134,24 +137,6 @@ export default function DirectorStats() {
       }))
       .sort((a, b) => parseInt(a.decade) - parseInt(b.decade));
 
-    const monthMap = {};
-    ratedMovies.forEach(movie => {
-      if (movie.releaseDate) {
-        const month = new Date(movie.releaseDate).getMonth();
-        const monthName = new Date(2000, month).toLocaleString('default', { month: 'long' });
-        if (!monthMap[monthName]) monthMap[monthName] = { total: 0, count: 0 };
-        monthMap[monthName].total += Number(movie.userRating || 0);
-        monthMap[monthName].count += 1;
-      }
-    });
-
-    const monthStats = Object.entries(monthMap)
-      .map(([month, data]) => ({
-        month,
-        avg: (data.total / data.count).toFixed(2),
-        count: data.count
-      }))
-      .sort((a, b) => new Date(`2000-${a.month}-01`).getMonth() - new Date(`2000-${b.month}-01`).getMonth());
 
     const sortedByRating = [...ratedMovies].sort((a, b) => b.userRating - a.userRating);
     const highestRated = sortedByRating.slice(0, 5);
@@ -165,7 +150,6 @@ export default function DirectorStats() {
       directorStats,
       genreStats,
       decadeStats,
-      monthStats,
       highestRated,
       lowestRated,
       ratedMoviesCount: ratedMovies.length
@@ -191,7 +175,6 @@ export default function DirectorStats() {
     directorStats,
     genreStats,
     decadeStats,
-    monthStats,
     highestRated,
     lowestRated,
     ratedMoviesCount
@@ -239,6 +222,29 @@ export default function DirectorStats() {
   const clearSelectedDirector = () => {
     setSelectedDirector(null);
   };
+
+  const handleGenreClick = (genre) => {
+    setSelectedGenre(genre);
+    setTimeout(() => {
+      document.getElementById('genre-details')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const clearSelectedGenre = () => {
+    setSelectedGenre(null);
+  };
+
+  const handleTimePeriodClick = (period) => {
+    setSelectedTimePeriod(period);
+    setTimeout(() => {
+      document.getElementById('time-details')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const clearSelectedTimePeriod = () => {
+    setSelectedTimePeriod(null);
+  };
+
 
   return (
     <div className="stats-page text-white p-6 max-w-6xl mx-auto">
@@ -346,7 +352,13 @@ export default function DirectorStats() {
                     <div key={genre.name} className="stats-item">
                       <div className="rank-number">#{index + 1}</div>
                       <div className="item-main">
-                        <div className="item-title">{genre.name}</div>
+                        <div 
+                          className="item-title clickable-genre"
+                          onClick={() => handleGenreClick(genre)}
+                          style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          {genre.name}
+                        </div>
                         <div className="item-subtitle">{genre.count} movies</div>
                       </div>
                       <div className="item-rating">
@@ -375,12 +387,11 @@ export default function DirectorStats() {
                       Rank #{directorStats.findIndex(d => d.name === selectedDirector.name) + 1}
                     </div>
                   </div>
-                  <button 
-                    onClick={clearSelectedDirector}
-                    className="text-gray-400 hover:text-white text-lg"
-                  >
-                    × Close
+                  <button onClick={clearSelectedDirector} className="close-button">
+                    <span className="text-xl">×</span>
+                    Close
                   </button>
+
                 </div>
                 
                 <div className="director-summary">
@@ -397,10 +408,22 @@ export default function DirectorStats() {
                 <h3 className="movies-list-title">Your Rated Movies</h3>
                 <div className="director-movies-list">
                   {selectedDirector.movies.map((movieTitle, index) => {
-                    const movie = movies.find(m => m.title === movieTitle);
+                    const movie = movies.find((m) => m.title === movieTitle);
+
                     return (
                       <div key={index} className="director-movie-item">
-                        <div className="movie-title">{movieTitle}</div>
+                        {movie ? (
+                          <a
+                            href={`https://www.themoviedb.org/movie/${movie.tmdbId || movie.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="movie-title hover:underline text-blue-400"
+                          >
+                            {movie.title}
+                          </a>
+                        ) : (
+                          <div className="movie-title">{movieTitle}</div>
+                        )}
                         <div className="movie-rating">
                           {movie?.userRating ? `${movie.userRating}★` : "Not rated"}
                         </div>
@@ -467,6 +490,54 @@ export default function DirectorStats() {
           </div>
         )}
 
+        {selectedGenre && (
+          <div id="genre-details" className="genre-details-section mb-8">
+            <div className="director-details-header">
+              <div>
+                <h2 className="section-title">{selectedGenre.name}</h2>
+                <div className="director-rank">
+                  Rank #{genreStats.findIndex(g => g.name === selectedGenre.name) + 1}
+                </div>
+              </div>
+              <button onClick={clearSelectedGenre} className="close-button">
+                <span className="text-xl">×</span>
+                Close
+              </button>
+            </div>
+
+            <div className="director-summary">
+              <div className="director-stat">
+                <span className="stat-value">{selectedGenre.count}</span>
+                <span className="stat-label">Movies Watched</span>
+              </div>
+              <div className="director-stat">
+                <span className="stat-value">{selectedGenre.avg}★</span>
+                <span className="stat-label">Average Rating</span>
+              </div>
+            </div>
+
+            <h3 className="movies-list-title">Movies in this Genre</h3>
+            <div className="director-movies-list">
+              {movies
+                .filter(m => {
+                  const genres = Array.isArray(m.genres)
+                    ? m.genres.map(g => g.name || g)
+                    : (m.genres || "").split(",").map(g => g.trim());
+                  return genres.includes(selectedGenre.name);
+                })
+                .map((movie, index) => (
+                  <div key={index} className="director-movie-item">
+                    <div className="movie-title">{movie.title}</div>
+                    <div className="movie-rating">
+                      {movie.userRating ? `${movie.userRating}★` : "Not rated"}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+
         {activeTab === "genres" && (
           <div>
             <h2 className="section-title">Genre Rankings</h2>
@@ -475,7 +546,13 @@ export default function DirectorStats() {
                 <div key={genre.name} className="stats-item">
                   <div className="rank-number">#{index + 1}</div>
                   <div className="item-main">
-                    <div className="item-title">{genre.name}</div>
+                    <div 
+                      className="item-title clickable-genre"
+                      onClick={() => handleGenreClick(genre)}
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      {genre.name}
+                    </div>
                     <div className="item-subtitle">{genre.count} movie{genre.count !== 1 ? 's' : ''}</div>
                   </div>
                   <div className="item-rating">
@@ -493,6 +570,51 @@ export default function DirectorStats() {
           </div>
         )}
 
+        {selectedTimePeriod && (
+          <div id="time-details" className="genre-details-section mb-8">
+            <div className="director-details-header">
+              <div>
+                <h2 className="section-title">
+                  {selectedTimePeriod.type === 'decade'
+                    ? selectedTimePeriod.value
+                    : selectedTimePeriod.value}
+                </h2>
+              </div>
+              <button onClick={clearSelectedTimePeriod} className="close-button">
+                <span className="text-xl">×</span>
+                Close
+              </button>
+            </div>
+
+            <h3 className="movies-list-title">Movies from this Period</h3>
+            <div className="director-movies-list">
+              {movies
+                .filter(m => {
+                  if (selectedTimePeriod.type === 'decade') {
+                    const year = m.releaseDate
+                      ? new Date(m.releaseDate).getFullYear()
+                      : parseInt(m.year);
+                    return Math.floor(year / 10) * 10 + 's' === selectedTimePeriod.value;
+                  } else {
+                    const monthName = new Date(m.releaseDate).toLocaleString('default', {
+                      month: 'long',
+                    });
+                    return monthName === selectedTimePeriod.value;
+                  }
+                })
+                .map((movie, index) => (
+                  <div key={index} className="director-movie-item">
+                    <div className="movie-title">{movie.title}</div>
+                    <div className="movie-rating">
+                      {movie.userRating ? `${movie.userRating}★` : "Not rated"}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+
         {activeTab === "time" && (
           <div className="stats-grid grid-2">
             <div>
@@ -501,29 +623,18 @@ export default function DirectorStats() {
                 {decadeStats.map((decade, index) => (
                   <div key={decade.decade} className="stats-item">
                     <div className="item-main">
-                      <div className="item-title">{decade.decade}</div>
+                      <div 
+                        className="item-title clickable-period"
+                        onClick={() => handleTimePeriodClick({ type: 'decade', value: decade.decade })}
+                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {decade.decade}
+                      </div>
+
                       <div className="item-subtitle">{decade.count} movies</div>
                     </div>
                     <div className="item-rating">
                       <div className="rating-value rating-normal">{decade.avg}★</div>
-                      <div className="rating-meta">average</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h2 className="section-title">By Release Month</h2>
-              <div className="stats-list">
-                {monthStats.map((month, index) => (
-                  <div key={month.month} className="stats-item">
-                    <div className="item-main">
-                      <div className="item-title">{month.month}</div>
-                      <div className="item-subtitle">{month.count} movies</div>
-                    </div>
-                    <div className="item-rating">
-                      <div className="rating-value rating-normal">{month.avg}★</div>
                       <div className="rating-meta">average</div>
                     </div>
                   </div>
@@ -542,9 +653,19 @@ export default function DirectorStats() {
                   <div key={movie.id} className="stats-item">
                     <div className="rank-number">#{index + 1}</div>
                     <div className="item-main">
-                      <div className="item-title">{movie.title}</div>
+                      <a
+                        href={`https://www.themoviedb.org/movie/${movie.tmdbId || movie.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="item-title hover:underline text-blue-400"
+                      >
+                        {movie.title}
+                      </a>
                       <div className="item-subtitle">
-                        {movie.director || "Unknown Director"} • {movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : "Unknown Year"}
+                        {movie.director || "Unknown Director"} •{" "}
+                        {movie.releaseDate
+                          ? new Date(movie.releaseDate).getFullYear()
+                          : "Unknown Year"}
                       </div>
                     </div>
                     <div className="item-rating">
@@ -563,7 +684,14 @@ export default function DirectorStats() {
                   <div key={movie.id} className="stats-item">
                     <div className="rank-number">#{index + 1}</div>
                     <div className="item-main">
-                      <div className="item-title">{movie.title}</div>
+                      <a
+                        href={`https://www.themoviedb.org/movie/${movie.tmdbId || movie.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="item-title hover:underline text-blue-400"
+                      >
+                        {movie.title}
+                      </a>
                       <div className="item-subtitle">
                         {movie.director || "Unknown Director"} • {movie.releaseDate ? new Date(movie.releaseDate).getFullYear() : "Unknown Year"}
                       </div>
