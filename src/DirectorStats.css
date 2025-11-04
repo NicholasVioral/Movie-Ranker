@@ -576,11 +576,33 @@
 }
 
 .clickable-director {
-  transition: all 0.3s ease;
+  cursor: pointer;
+  color: #60a5fa;
+  transition: color 0.2s ease, transform 0.15s ease;
 }
 
 .clickable-director:hover {
-  color: #f59e0b !important;
+  color: #93c5fd;
+}
+
+.clickable-genre {
+  cursor: pointer;
+  color: #34d399;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.clickable-genre:hover {
+  color: #6ee7b7;
+}
+
+.clickable-period {
+  cursor: pointer;
+  color: #fbbf24;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.clickable-period:hover {
+  color: #fde68a;
 }
 
 .director-rank {

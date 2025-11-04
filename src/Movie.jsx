@@ -262,6 +262,8 @@ export default function Movie() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [showOnlyRating, setShowOnlyRating] = useState(null);
+  const [showColorSettings, setShowColorSettings] = useState(false);
+
 
 
 
@@ -408,7 +410,10 @@ export default function Movie() {
             userRating: row["Your Rating"] ? parseInt(row["Your Rating"]) : null,
             url: row.URL?.trim(),
             year: row.Year?.trim(),
-            genres: row.Genres?.trim(),
+            genres: (row.Genres?.split(",") || [])
+              .map((g) => g.trim())
+              .filter(Boolean)
+              .map((name) => ({ name })),
             director: row.Directors?.trim(),
           }));
 
@@ -428,7 +433,7 @@ export default function Movie() {
       skipEmptyLines: true,
       complete: async (results) => {
         setIsLoading(true);
-        
+
         const parsedMovies = await Promise.all(
           results.data.map(async (row) => {
             const title = row.Name?.trim();
@@ -439,7 +444,7 @@ export default function Movie() {
 
             // Try to fetch movie data from TMDb for poster, genres, director, etc.
             const fetched = await fetchMovieData(`${title} ${year}`);
-            
+
             if (fetched) {
               return {
                 title,
@@ -447,8 +452,12 @@ export default function Movie() {
                 userRating: rating,
                 url,
                 ...fetched,
-                // Ensure we have director data
-                director: fetched.director || "Unknown Director"
+                // ✅ Normalize genres: always array of { name }
+                genres: (fetched.genres || []).map((g) =>
+                  typeof g === "string" ? { name: g } : { name: g.name }
+                ),
+                // ✅ Ensure we have director data
+                director: fetched.director || "Unknown Director",
               };
             } else {
               // Fallback if TMDb search fails
@@ -458,25 +467,27 @@ export default function Movie() {
                 userRating: rating,
                 url,
                 director: "Unknown Director",
-                id: crypto.randomUUID()
+                id: crypto.randomUUID(),
+                genres: [], // ✅ Always include an empty array for consistency
               };
             }
           })
         );
 
         // Filter out null results and merge with existing movies
-        const validMovies = parsedMovies.filter(movie => movie !== null);
-        
+        const validMovies = parsedMovies.filter((movie) => movie !== null);
+
         setMovies((prev) => {
           const updated = [...prev, ...validMovies];
           saveRankings(updated);
           return updated;
         });
-        
+
         setIsLoading(false);
       },
     });
   };
+
 
   const groupByRating = (movies) => {
     // Pre-fill all groups 10 → 1 and Unsorted
@@ -715,6 +726,27 @@ export default function Movie() {
     }
   };
 
+  const defaultColorMap = {
+    10: "#a21caf",
+    9: "#2563eb",
+    8: "#0ea5e9",
+    7: "#14b8a6",
+    6: "#10b981",
+    5: "#84cc16",
+    4: "#eab308",
+    3: "#f97316",
+    2: "#ef4444",
+    1: "#463636ff",
+    Unsorted: "#6b7280",
+  };
+
+  const [colorMap, setColorMap] = useState(() => {
+    const saved = localStorage.getItem("colorMap");
+    return saved ? JSON.parse(saved) : defaultColorMap;
+  });
+
+
+
 
   return (
     <div className="movie">
@@ -845,6 +877,58 @@ export default function Movie() {
         Showing {filteredAndSortedMovies().length} of {movies.length} movies
       </div>
 
+      <div className="color-customizer">
+        <button
+          onClick={() => setShowColorSettings((prev) => !prev)}
+          style={{
+            marginBottom: "10px",
+            background: "#333",
+            color: "white",
+            padding: "6px 12px",
+            borderRadius: "6px",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          {showColorSettings ? "Hide Colors" : "Customize Colors"}
+        </button>
+
+        {showColorSettings && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+              gap: "10px",
+              marginBottom: "15px",
+            }}
+          >
+            {Object.entries(colorMap).map(([rating, color]) => (
+              <div key={rating} style={{ textAlign: "center" }}>
+                <label style={{ color: "white" }}>
+                  {rating === "Unsorted" ? "Unsorted" : `${rating}★`}
+                </label>
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => {
+                    const newColorMap = { ...colorMap, [rating]: e.target.value };
+                    setColorMap(newColorMap);
+                    localStorage.setItem("colorMap", JSON.stringify(newColorMap));
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "30px",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+
       <DndContext
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
@@ -868,21 +952,6 @@ export default function Movie() {
             if (filterRating !== "All" && Number(rating) !== Number(filterRating)) {
               return null;
             }
-
-            const colorMap = {
-              10: "#a21caf",
-              9: "#2563eb",
-              8: "#0ea5e9",
-              7: "#14b8a6",
-              6: "#10b981",
-              5: "#84cc16",
-              4: "#eab308",
-              3: "#f97316",
-              2: "#ef4444",
-              1: "#000000ff",
-              Unsorted: "#6b7280",
-            };
-
 
             const bgColor = colorMap[rating] || "#333";
 

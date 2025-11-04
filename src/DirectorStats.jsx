@@ -462,17 +462,12 @@ export default function DirectorStats() {
                     <div 
                       className="item-title clickable-director" 
                       onClick={() => handleDirectorClick(director)}
-                      style={{cursor: 'pointer', textDecoration: 'underline'}}
+                      style={{cursor: 'pointer'}}
                     >
                       {director.name}
                     </div>
                     <div className="item-subtitle">
                       {director.count} movie{director.count !== 1 ? 's' : ''}
-                      {director.ratings && (
-                        <span className="text-xs text-gray-400 ml-2">
-                          ({director.ratings.join(', ')})
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div className="item-rating">
@@ -549,7 +544,7 @@ export default function DirectorStats() {
                     <div 
                       className="item-title clickable-genre"
                       onClick={() => handleGenreClick(genre)}
-                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      style={{ cursor: 'pointer'}}
                     >
                       {genre.name}
                     </div>
@@ -626,7 +621,7 @@ export default function DirectorStats() {
                       <div 
                         className="item-title clickable-period"
                         onClick={() => handleTimePeriodClick({ type: 'decade', value: decade.decade })}
-                        style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ cursor: 'pointer'}}
                       >
                         {decade.decade}
                       </div>
