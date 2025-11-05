@@ -1,7 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Link, useLocation } from "react-router-dom";
 import Movie from "./Movie.jsx";
 import DirectorStats from "./DirectorStats.jsx";
-import "./App.css"; // 👈 new CSS file for styling
+import "./App.css";
 
 function NavBar() {
   const location = useLocation();
@@ -31,13 +31,13 @@ function NavBar() {
 
 function App() {
   return (
-    <Router>
+    <>
       <NavBar />
       <Routes>
         <Route path="/" element={<Movie />} />
         <Route path="/stats" element={<DirectorStats />} />
       </Routes>
-    </Router>
+    </>
   );
 }
 

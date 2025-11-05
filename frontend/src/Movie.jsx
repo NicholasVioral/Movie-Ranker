@@ -263,9 +263,10 @@ export default function Movie() {
   const [searchResult, setSearchResult] = useState(null);
   const [showOnlyRating, setShowOnlyRating] = useState(null);
   const [showColorSettings, setShowColorSettings] = useState(false);
-
-
-
+  const [savedLists, setSavedLists] = useState([]);
+  const [showSaveListModal, setShowSaveListModal] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [showLoadListModal, setShowLoadListModal] = useState(false);
 
   useEffect(() => {
     // Fetch all available genres
@@ -302,8 +303,21 @@ export default function Movie() {
       }
     };
 
+    const fetchSavedLists = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/saved-lists?userId=${USER_ID}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSavedLists(data.lists || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch saved lists", err);
+      }
+    };
+
     fetchGenres();
     fetchRankings();
+    fetchSavedLists();
   }, []);
 
   const handleSearch = () => {
@@ -326,7 +340,6 @@ export default function Movie() {
     });
   };
 
-
   const saveRankings = async (updatedMovies) => {
     try {
       await fetch("http://localhost:5000/rankings", {
@@ -338,7 +351,6 @@ export default function Movie() {
         })
       });
       setSaveMessage("✅ Rankings saved!");
-      // Clear the message after a few seconds
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (err) {
       console.error("Failed to save rankings", err);
@@ -346,6 +358,85 @@ export default function Movie() {
       setTimeout(() => setSaveMessage(""), 3000);
     }
   }
+
+  const saveCurrentList = async () => {
+    if (!newListName.trim()) {
+      alert("Please enter a list name");
+      return;
+    }
+
+    try {
+      const res = await fetch("http://localhost:5000/saved-lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: USER_ID,
+          listName: newListName.trim(),
+          movies: movies,
+          createdAt: new Date().toISOString()
+        })
+      });
+
+      if (res.ok) {
+        setSaveMessage(`✅ List "${newListName}" saved!`);
+        setNewListName("");
+        setShowSaveListModal(false);
+        
+        // Refresh saved lists
+        const listsRes = await fetch(`http://localhost:5000/saved-lists?userId=${USER_ID}`);
+        if (listsRes.ok) {
+          const data = await listsRes.json();
+          setSavedLists(data.lists || []);
+        }
+        
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        alert("Failed to save list");
+      }
+    } catch (err) {
+      console.error("Failed to save list", err);
+      alert("Failed to save list");
+    }
+  };
+
+  const loadSavedList = async (listId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/saved-lists/${listId}`);
+      if (res.ok) {
+        const list = await res.json();
+        setMovies(list.movies || []);
+        setSaveMessage(`✅ Loaded "${list.listName}"`);
+        setShowLoadListModal(false);
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        alert("Failed to load list");
+      }
+    } catch (err) {
+      console.error("Failed to load list", err);
+      alert("Failed to load list");
+    }
+  };
+
+  const deleteSavedList = async (listId, listName) => {
+    if (!window.confirm(`Are you sure you want to delete "${listName}"?`)) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/saved-lists/${listId}`, {
+        method: "DELETE"
+      });
+
+      if (res.ok) {
+        setSavedLists(prev => prev.filter(list => list.id !== listId));
+        setSaveMessage(`✅ Deleted "${listName}"`);
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        alert("Failed to delete list");
+      }
+    } catch (err) {
+      console.error("Failed to delete list", err);
+      alert("Failed to delete list");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -423,7 +514,6 @@ export default function Movie() {
     });
   };
 
-
   const handleLetterboxdImport = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -488,7 +578,6 @@ export default function Movie() {
     });
   };
 
-
   const groupByRating = (movies) => {
     // Pre-fill all groups 10 → 1 and Unsorted
     const groups = { Unsorted: [] };
@@ -503,12 +592,9 @@ export default function Movie() {
     return groups;
   };
 
-
-
   const displayedMovies = filterRating === "All"
   ? movies
   : movies.filter(movie => movie.userRating === Number(filterRating));
-
 
   const TMDB_API_KEY = "YOUR_TMDB_KEY";
 
@@ -584,7 +670,6 @@ export default function Movie() {
     setMovies((prev) => [...prev, ...newMovies]);
     setIsLoading(false);
   };
-
 
   const handleExport = () => {
     if (!movies || movies.length === 0) {
@@ -685,7 +770,6 @@ export default function Movie() {
     });
   };
 
-
   const filteredAndSortedMovies = () => {
     let result = [...movies];
     
@@ -744,7 +828,6 @@ export default function Movie() {
     const saved = localStorage.getItem("colorMap");
     return saved ? JSON.parse(saved) : defaultColorMap;
   });
-
 
   return (
     <div className="movie">
@@ -860,6 +943,23 @@ export default function Movie() {
 
         <button
           type="button"
+          onClick={() => setShowSaveListModal(true)}
+          disabled={movies.length === 0}
+          className="save-list-btn"
+        >
+          Save Current List
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowLoadListModal(true)}
+          className="load-list-btn"
+        >
+          Load Saved List
+        </button>
+
+        <button
+          type="button"
           onClick={clearList}
           className="clear-btn"
         >
@@ -874,6 +974,58 @@ export default function Movie() {
       <div className="movie-count">
         Showing {filteredAndSortedMovies().length} of {movies.length} movies
       </div>
+
+      {/* === Save List Modal === */}
+      {showSaveListModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Save Current List</h3>
+            <input
+              type="text"
+              placeholder="Enter list name"
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && saveCurrentList()}
+            />
+            <div className="modal-buttons">
+              <button onClick={saveCurrentList}>Save</button>
+              <button onClick={() => setShowSaveListModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === Load List Modal === */}
+      {showLoadListModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>Load Saved List</h3>
+            {savedLists.length === 0 ? (
+              <p>No saved lists found</p>
+            ) : (
+              <div className="saved-lists">
+                {savedLists.map((list) => (
+                  <div key={list.id} className="saved-list-item">
+                    <span>{list.listName} ({list.movies?.length || 0} movies)</span>
+                    <div>
+                      <button onClick={() => loadSavedList(list.id)}>Load</button>
+                      <button 
+                        onClick={() => deleteSavedList(list.id, list.listName)}
+                        className="delete-btn"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="modal-buttons">
+              <button onClick={() => setShowLoadListModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="color-customizer">
         <button
@@ -925,7 +1077,6 @@ export default function Movie() {
           </div>
         )}
       </div>
-
 
       <DndContext
         collisionDetection={closestCenter}
@@ -1001,22 +1152,3 @@ export default function Movie() {
     </div>
   );
 }
-
-{/* <div className="search-container">
-          <input
-            type="text"
-            placeholder="Search movie..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button onClick={handleSearch}>Search</button>
-        </div>
-
-        {searchResult && (
-          <div className="search-result">
-            🎬 <strong>{searchResult.title}</strong>{" "}
-            {searchResult.userRating
-              ? `is ranked #${searchResult.rankInGroup} in ${searchResult.userRating}★ Movies`
-              : "is currently Unrated"}
-          </div>
-        )} */}
