@@ -1,0 +1,542 @@
+/* Movie.css - Updated Dark Theme */
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  color: #e2e8f0;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* === Container === */
+.movie {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* === Header === */
+.movie h1 {
+  font-size: 3rem;
+  margin-bottom: 2.5rem;
+  text-align: center;
+  font-weight: 800;
+  background: linear-gradient(135deg, #f59e0b, #ecc94b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);
+}
+
+/* === Form === */
+form {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+input[type="text"] {
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 2px solid #4a5568;
+  outline: none;
+  width: 320px;
+  background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+  color: #fff;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+input[type="text"]:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+form button {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #1a202c;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+form button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
+}
+
+/* === Controls Container === */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5rem;
+  margin: 2rem 0 3rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(45, 55, 72, 0.8), rgba(26, 32, 44, 0.8));
+  border-radius: 16px;
+  border: 1px solid #4a5568;
+  backdrop-filter: blur(10px);
+}
+
+/* === Control Groups === */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.control-group label {
+  font-weight: 600;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+select {
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 2px solid #4a5568;
+  background: linear-gradient(135deg, #2d3748, #4a5568);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+  min-width: 150px;
+}
+
+select:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+/* === Import & Action Buttons === */
+.import-btn {
+  position: relative;
+  background: linear-gradient(135deg, #4a5568, #2d3748);
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid #4a5568;
+  color: #e2e8f0;
+  font-weight: 600;
+  text-align: center;
+  overflow: hidden;
+}
+
+.import-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.import-btn:hover::before {
+  left: 100%;
+}
+
+.import-btn:hover {
+  border-color: #f59e0b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.save-btn {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  border: 2px solid #48bb78;
+}
+
+.save-btn:hover {
+  border-color: #68d391;
+  box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+}
+
+.save-btn:disabled {
+  background: #4a5568;
+  border-color: #4a5568;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.export-btn {
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  color: white;
+  border: 2px solid #4299e1;
+}
+
+.export-btn:hover {
+  border-color: #63b3ed;
+  box-shadow: 0 4px 15px rgba(66, 153, 225, 0.4);
+}
+
+.clear-btn {
+  background: linear-gradient(135deg, #f56565, #e53e3e);
+  color: white;
+  border: 2px solid #f56565;
+}
+
+.clear-btn:hover {
+  border-color: #fc8181;
+  box-shadow: 0 4px 15px rgba(245, 101, 101, 0.4);
+}
+
+/* === Status Messages === */
+.save-feedback {
+  padding: 1rem 1.5rem;
+  margin: 1rem auto;
+  border-radius: 10px;
+  font-weight: 600;
+  text-align: center;
+  max-width: 400px;
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === Movie Count === */
+.movie-count {
+  text-align: center;
+  color: #a0aec0;
+  font-style: italic;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background: rgba(45, 55, 72, 0.6);
+  border-radius: 10px;
+  border: 1px solid #4a5568;
+}
+
+/* === Rating Groups === */
+.rating-group {
+  margin-bottom: 3rem;
+}
+
+.rating-divider {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 2.5rem 0 1.5rem 0;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #2d3748, #4a5568);
+  border-radius: 12px;
+  border-left: 4px solid #f59e0b;
+  color: #e2e8f0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* === Movie Items === */
+.movie-item {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+  border: 2px solid #4a5568;
+  transition: all 0.3s ease;
+  cursor: grab;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.movie-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.movie-item:hover::before {
+  left: 100%;
+}
+
+.movie-item:hover {
+  border-color: #f59e0b;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.movie-item:active {
+  cursor: grabbing;
+}
+
+/* === Rank Number === */
+.rank {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #f59e0b;
+  min-width: 3rem;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* === Poster === */
+.poster {
+  width: 70px;
+  height: 105px;
+  border-radius: 8px;
+  border: 2px solid #4a5568;
+  object-fit: cover;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.movie-item:hover .poster {
+  border-color: #f59e0b;
+  transform: scale(1.05);
+}
+
+/* === Movie Details === */
+.movie-details {
+  text-align: left;
+  flex: 1;
+}
+
+.movie-item a {
+  font-size: 1.2rem;
+  color: #e2e8f0;
+  text-decoration: none;
+  font-weight: 700;
+  transition: color 0.3s ease;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.movie-item a:hover {
+  color: #f59e0b;
+  text-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+.movie-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #a0aec0;
+}
+
+.score {
+  color: #f5c518;
+  font-weight: 700;
+  background: rgba(245, 197, 24, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+
+.genres, .year {
+  background: rgba(160, 174, 192, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+
+/* === Rating Select === */
+.movie-item select {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  min-width: 120px;
+  background: linear-gradient(135deg, #2d3748, #4a5568);
+  border: 2px solid #4a5568;
+  color: #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.movie-item select:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+/* === Delete Button === */
+.delete-btn {
+  background: none;
+  border: 2px solid #4a5568;
+  color: #a0aec0;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 101, 101, 0.1);
+}
+
+.delete-btn:hover {
+  transform: scale(1.1);
+  color: #f56565;
+  border-color: #f56565;
+  background: rgba(245, 101, 101, 0.2);
+  box-shadow: 0 4px 12px rgba(245, 101, 101, 0.3);
+}
+
+/* === Loading State === */
+.loading {
+  background: linear-gradient(135deg, #2d3748, #4a5568);
+  padding: 2rem;
+  border-radius: 12px;
+  margin: 1rem 0;
+  text-align: center;
+  color: #a0aec0;
+  border: 2px solid #4a5568;
+}
+
+/* === Responsive Design === */
+@media (max-width: 768px) {
+  .movie {
+    padding: 1rem;
+  }
+  
+  .movie h1 {
+    font-size: 2.2rem;
+  }
+  
+  .controls {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .control-group {
+    align-items: center;
+    width: 100%;
+  }
+  
+  select {
+    width: 100%;
+    max-width: 250px;
+  }
+  
+  .movie-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+  
+  .movie-details {
+    text-align: center;
+  }
+  
+  .movie-meta {
+    justify-content: center;
+  }
+  
+  input[type="text"] {
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 480px) {
+  .movie h1 {
+    font-size: 1.8rem;
+  }
+  
+  form {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .rating-divider {
+    font-size: 1.2rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  .movie-item {
+    padding: 1rem;
+  }
+}
+
+/* === Scrollbar Styling === */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2d3748;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #f59e0b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d97706;
+}
+
+/* === Animation for drag and drop === */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.movie-item {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* === File Upload Hidden Input === */
+.file-upload {
+  display: none;
+}
+
+/* === Button Group Alignment === */
+.controls > * {
+  flex-shrink: 0;
+}
+
+/* === Select Options Styling === */
+select option {
+  background-color: #2d3748;
+  color: #e2e8f0;
+  padding: 0.5rem;
+}
+
+select option:hover {
+  background-color: #f59e0b !important;
+  color: #1a202c !important;
+}
